@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import datetime  # 引入時間庫用於預測日期
+import datetime
 
 # --- 1. 網頁基本設定 ---
 st.set_page_config(page_title="中學生智慧理財系統", layout="wide")
@@ -51,7 +51,7 @@ with st.expander("3. 點開填寫：每月必定消費的開支 (剛需開支)",
     )
     
     edited_essential_df["選入計算"] = edited_essential_df["選入計算"].fillna(False).astype(bool)
-    active_essential = edited_essential_df[edited_essential_df["消費金額"] == True]
+    active_essential = edited_essential_df[edited_essential_df["選入計算"] == True]
     total_essential = pd.to_numeric(active_essential["消費金額"], errors='coerce').fillna(0).sum()
     essential_total_placeholder.metric("必定消費總計 (已選入)", f"{total_essential} 元")
 
@@ -104,7 +104,6 @@ else:
     else:
         base_months = needed_amount / base_savings
         base_days = base_months * 30.4
-        # 計算預測日期：今天 + 需要等待的天數
         predicted_date = datetime.date.today() + datetime.timedelta(days=int(base_days))
     
     col_kpi1, col_kpi2 = st.columns(2)
@@ -112,7 +111,6 @@ else:
         st.metric(label="每月淨儲蓄", value=f"{round(base_savings)} 元")
     with col_kpi2:
         st.metric(label="預計解鎖時間", value=f"{round(base_days)} 天", delta=f"{round(base_months, 1)} 個月", delta_color="inverse")
-        # 在天數下方加粗顯示預測實現的精確日期
         st.markdown(f"### **預測實現日期：{predicted_date.strftime('%Y年%m月%d日')}**")
         
     s_percentages = [i / 10.0 for i in range(0, 11)]
@@ -120,7 +118,9 @@ else:
     marginal_data = []
     prev_days = base_days 
     
+    # 核心算法升級：同時將具體金額與該場景下的精確日期存入 DataFrame
     for i, s in enumerate(s_percentages):
+        saved_amount = total_discretionary * s  # 計算該比例下具體省了多少錢
         new_discretionary = total_discretionary * (1 - s)
         new_savings = income - total_essential - new_discretionary
         
@@ -131,8 +131,15 @@ else:
             new_days = new_months * 30.4
             
         days_saved = base_days - new_days
+        # 計算在此省錢場景下，未來的具體實現日期
+        scenario_date = datetime.date.today() + datetime.timedelta(days=int(new_days))
         
-        sensitivity_data.append({"節省比例": f"{int(s * 100)}%", "累積提前天數": round(days_saved)})
+        sensitivity_data.append({
+            "節省比例": f"{int(s * 100)}%", 
+            "累積提前天數": round(days_saved),
+            "具體金額數值": round(saved_amount),
+            "具體日期": scenario_date.strftime('%Y年%m月%d日')
+        })
         if i > 0:
             marginal_data.append({"節省比例變動 (X)": f"{int(s_percentages[i-1]*100)}% → {int(s*100)}%", "邊際提前天數 (Y)": round(prev_days - new_days, 1)})
         prev_days = new_days
@@ -142,23 +149,31 @@ else:
     
     graph_col1, graph_col2 = st.columns(2)
     
-    # ---- 左圖：趨勢折線圖與點擊事件監聽 ----
+    # ---- 左圖：累積儲蓄效益 ----
     with graph_col1:
         st.subheader("累積儲蓄效益")
         fig_trend = px.line(df_trend, x="節省比例", y="累積提前天數", markers=True, template="plotly_white")
-        fig_trend.update_layout(clickmode='event+select') # 啟用點擊選取模式
+        fig_trend.update_layout(clickmode='event+select')
         
-        # 使用 on_select="rerun" 監聽點擊動作
         selected_trend = st.plotly_chart(fig_trend, on_select="rerun", use_container_width=True, key="trend_chart")
         
-        # 判斷使用者是否有選取點
+        # 點擊聯動邏輯升級：動態反查對應的金額與日期
         if selected_trend and "selection" in selected_trend and selected_trend["selection"]["points"]:
             pt = selected_trend["selection"]["points"][0]
-            st.info(f"已選中點數據：當省錢比例為 {pt['x']} 時，總共可提前 {pt['y']} 天實現目標。")
+            click_x = pt['x']
+            
+            # 從資料庫反查對應欄位
+            matched_row = df_trend[df_trend["節省比例"] == click_x].iloc[0]
+            exact_money = matched_row["具體金額數值"]
+            exact_date = matched_row["具體日期"]
+            days_ahead = matched_row["累積提前天數"]
+            
+            # 按照要求的格式完美輸出
+            st.info(f"已選中點數據：當省錢比例為 {click_x} （即每個月省下 {exact_money} 元）時，總共可提前 {days_ahead} 天（即在 {exact_date} ）實現目標。")
         else:
             st.caption("提示：點擊上方折線圖中的藍色圓點，可在這裡動態查看該點的數據。")
 
-    # ---- 右圖：邊際柱狀圖與點擊事件監聽 ----
+    # ---- 右圖：邊際省錢效益 ----
     with graph_col2:
         st.subheader("邊際省錢效益")
         fig_marginal = px.bar(df_marginal, x="節省比例變動 (X)", y="邊際提前天數 (Y)", template="plotly_white")
