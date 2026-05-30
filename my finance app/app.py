@@ -6,9 +6,25 @@ import datetime
 # --- 1. 網頁基本設定 ---
 st.set_page_config(page_title="中學生智慧理財系統", layout="wide")
 
-# ---- 1. 每個月的收入 ----
-st.markdown("### **1. 每月固定收入 / 零用錢額度 (元)**")
-income = st.number_input("", min_value=0, value=1500, step=50, label_visibility="collapsed", key="income_input")
+# ---- 1. 零用錢收入配置 (升級為多週期動態換算) ----
+st.markdown("### **1. 零用錢收入配置**")
+col_freq, col_amt = st.columns([1, 2])
+
+with col_freq:
+    inc_freq = st.selectbox("請選擇收入發放週期：", ["每日發放", "每周發放", "每月發放"], index=2, key="inc_freq_select")
+
+with col_amt:
+    if inc_freq == "每日發放":
+        raw_income = st.number_input("請輸入每日零用錢金額 (元)：", min_value=0, value=50, step=10, key="income_daily")
+        income = raw_income * 30.4
+    elif inc_freq == "每周發放":
+        raw_income = st.number_input("請輸入每周零用錢金額 (元)：", min_value=0, value=350, step=50, key="income_weekly")
+        income = raw_income * (30.4 / 7)
+    else:
+        raw_income = st.number_input("請輸入每月零用錢金額 (元)：", min_value=0, value=1500, step=50, key="income_monthly")
+        income = raw_income
+
+st.caption(f"系統後台已自動將其標準化換算為每月等值收入：約 {round(income)} 元")
 st.write("") 
 
 # ---- 2. 目前個人總存款 摺疊區 ----
@@ -153,11 +169,10 @@ with st.expander("4. 每月非必要娛樂開支預算 (彈性消費)", expanded
 st.write("") 
 st.divider()
 
-# ---- 5. 夢想目標輸入區 ----
-st.markdown("### **5. 設定最終儲蓄目標與自定義測試金額**")
+# ---- 5. 夢想目標輸入區 (已移除自定義測試儲蓄金額欄位) ----
+st.markdown("### **5. 設定最終儲蓄目標**")
 target_name = st.text_input("儲蓄目標物名稱", value="最新款降噪耳機")
 target_value = st.number_input("目標物市場價格 (元)", min_value=1, value=3000, step=100)
-custom_target_value = st.number_input("對比測試：自定義其他儲蓄目標金額 (元，不測試請設為 0)", min_value=0, value=0, step=500, key="custom_target_input")
 
 
 # --- 6. 核心計量算法：雙向現金流 + 理財複利時序模擬器 ---
@@ -212,10 +227,6 @@ else:
     with col_kpi2:
         st.metric(label="預估達標時間", value=f"{round(base_days)} 天 ({round(base_months, 1)} 個月)")
         st.markdown(f"### **精確達標日期：{predicted_date.strftime('%Y年%m月%d日')}**")
-    
-    if custom_target_value > 0:
-        cust_days_base, cust_date_base = simulate_timeline(custom_target_value, total_savings, base_savings, active_incomes, active_expenses, 0.0)
-        st.write(f"對比結果：若要存滿自定義目標 {custom_target_value} 元，在常態儲蓄下需要 {cust_days_base} 天（約於 {cust_date_base.strftime('%Y年%m月%d日')} 達標）。")
         
     s_percentages = [i / 10.0 for i in range(0, 11)]
     sensitivity_data = []
@@ -272,7 +283,7 @@ else:
             pt = selected_marginal["selection"]["points"][0]
             st.info(f"區間數據：在 {pt['x']} 階段，每多省 10% 娛樂費可讓時間再縮短 {pt['y']} 天。")
         else:
-            st.caption("提示：點擊柱狀圖的長條，可查看該區間的詳細邊際效益。")
+            st.caption("提示：點擊柱狀圖的長條，可查看該區間的詳細邊際效益. ")
 
     st.write("")
     st.markdown("### **開支優化決策：少花這筆，提早幾天？ (常態儲蓄)**")
@@ -345,12 +356,6 @@ else:
             delta_color="inverse"
         )
         st.markdown(f"### **優化後達標日期：{predicted_date_inv.strftime('%Y年%m月%d日')}**")
-        
-    if custom_target_value > 0:
-        cust_days_base, _ = simulate_timeline(custom_target_value, total_savings, base_savings, active_incomes, active_expenses, 0.0)
-        cust_days_inv, cust_date_inv = simulate_timeline(custom_target_value, total_savings, base_savings, active_incomes, active_expenses, active_rate)
-        cust_improved = cust_days_base - cust_days_inv
-        st.write(f"對比結果：若要存滿自定義目標 {custom_target_value} 元，理財加持下需要 {cust_days_inv} 天（約於 {cust_date_inv.strftime('%Y年%m月%d日')} 達標），比不理財提早了 {round(cust_improved)} 天。")
 
     # ---------------------------------------------------------
     # ⏳ 專屬理財時間軸指南
