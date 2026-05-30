@@ -5,12 +5,12 @@ import plotly.express as px
 # --- 1. 網頁基本設定 ---
 st.set_page_config(page_title="中學生智慧理財系統", layout="wide")
 
-# ---- 1. 每個月的收入 (單獨一行) ----
+# ---- 1. 每個月的收入 ----
 st.markdown("### **1. 每個月的收入 / 零花錢總額 (元)**")
 income = st.number_input("", min_value=0, value=1500, step=50, label_visibility="collapsed", key="income_input")
 st.write("") 
 
-# ---- 2. 目前個人總存款 摺疊區 (單獨一行) ----
+# ---- 2. 目前個人總存款 摺疊區 ----
 with st.expander("2. 點開填寫：目前個人總存款 (元)", expanded=True):
     savings_total_placeholder = st.empty()
     
@@ -33,7 +33,7 @@ with st.expander("2. 點開填寫：目前個人總存款 (元)", expanded=True)
 
 st.write("") 
 
-# ---- 3. 每月必定消費（剛需）摺疊區 (單獨一行) ----
+# ---- 3. 每月必定消費（剛需）摺疊區 ----
 with st.expander("3. 點開填寫：每月必定消費的開支 (剛需開支)", expanded=True):
     essential_total_placeholder = st.empty()
     
@@ -56,7 +56,7 @@ with st.expander("3. 點開填寫：每月必定消費的開支 (剛需開支)",
 
 st.write("")
 
-# ---- 4. 每月自我意願消費（非剛需）摺疊區 (單獨一行) ----
+# ---- 4. 每月自我意願消費（非剛需）摺疊區 ----
 with st.expander("4. 點開填寫：每月自我意願消費 (娛樂開支)", expanded=True):
     discretionary_total_placeholder = st.empty()
     
@@ -80,7 +80,7 @@ with st.expander("4. 點開填寫：每月自我意願消費 (娛樂開支)", ex
 st.write("") 
 st.divider()
 
-# ---- 5. 夢想目標輸入區 (單獨一行) ----
+# ---- 5. 夢想目標輸入區 ----
 st.markdown("### **5. 存錢想買的東西以及金額**")
 target_name = st.text_input("你想買的夢想物品名稱", value="最新款降噪耳機")
 target_value = st.number_input("該物品的目標價值 (元)", min_value=1, value=3000, step=100)
@@ -93,12 +93,12 @@ base_savings = income - total_essential - total_discretionary
 needed_amount = target_value - total_savings
 
 if base_savings <= 0:
-    st.error(f"預算超支警告：你每月的總開銷已經超過了你的收入！請點開上方摺疊盒刪減非必須開支。")
+    st.error("預算超支警告：你每月的總開銷已經超過了你的收入！請點開上方摺疊盒刪減非必須開支。")
 else:
     if needed_amount <= 0:
         base_months = 0.0
         base_days = 0.0
-        st.success(f"目前選入的總存款已足夠購買此物品，無需額外等待儲蓄時間。")
+        st.success("目前選入的總存款已足夠購買此物品，無需額外等待儲蓄時間。")
     else:
         base_months = needed_amount / base_savings
         base_days = base_months * 30.4
@@ -136,4 +136,8 @@ else:
     
     graph_col1, graph_col2 = st.columns(2)
     with graph_col1:
-        st.subheader("累積儲
+        st.subheader("累積儲蓄效益")
+        st.plotly_chart(px.line(df_trend, x="節省比例", y="累積提前天數", markers=True, template="plotly_white"), use_container_width=True)
+    with graph_col2:
+        st.subheader("邊際省錢效益")
+        st.plotly_chart(px.bar(df_marginal, x="節省比例變動 (X)", y="邊際提前天數 (Y)", template="plotly_white"), use_container_width=True)
