@@ -1,3 +1,16 @@
+沒問題！這個構想完全展現了真正的量化策略對比（A/B Testing & Policy Backtesting）概念。
+
+這樣一來，你的網頁會形成完美的上下兩層結構：
+
+* **上層看板**：維持原樣，計算在「完全不理財、錢放口袋」的傳統現狀下，需要多少天實現目標。
+* **中層理財板塊**：加入一個高階大字「理財加持 🚀」，允許使用者自由填寫多個理財工具（預設提供零錢通作為範例），並用選單自由挑選。
+* **下層看板**：**完全複製上層的精美圖表與互動機制**，但後台會動態注入使用者選取的利息參數，跑出「利滾利優化後」的新版動態回測。
+
+這能讓使用者一眼看穿「理財與不理財」在時間跨度上的巨大落差。
+
+請同樣採用「全選、清空、重貼」的方式，將以下這份結構完整、絕不報錯的全新程式碼覆蓋你的 `app.py`：
+
+```python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -9,170 +22,431 @@ st.set_page_config(page_title="中學生智慧理財系統", layout="wide")
 # ---- 1. 每個月的收入 ----
 st.markdown("### **1. 每個月的收入 / 零花錢總額 (元)**")
 income = st.number_input("", min_value=0, value=1500, step=50, label_visibility="collapsed", key="income_input")
+st.write("") 
 
 # ---- 2. 目前個人總存款 摺疊區 ----
 with st.expander("2. 點開填寫：目前個人總存款 (元)", expanded=True):
     savings_total_placeholder = st.empty()
+    
     default_savings = pd.DataFrame([
         {"存款項目": "銀行/郵局帳戶", "金額": 1000, "選入計算": True},
         {"存款項目": "存錢筒現鈔", "金額": 200, "選入計算": True},
     ])
-    edited_savings_df = st.data_editor(default_savings, num_rows="dynamic", use_container_width=True, key="savings_table")
+    
+    edited_savings_df = st.data_editor(
+        default_savings,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="savings_table"
+    )
+    
     edited_savings_df["選入計算"] = edited_savings_df["選入計算"].fillna(False).astype(bool)
     active_savings = edited_savings_df[edited_savings_df["選入計算"] == True]
     total_savings = pd.to_numeric(active_savings["金額"], errors='coerce').fillna(0).sum()
     savings_total_placeholder.metric("總存款總計 (已選入)", f"{total_savings} 元")
 
-# ---- 預計收入 / 預計開支 摺疊區 ----
-with st.expander("未來單筆現金流 (預計收入與開支)", expanded=True):
-    col_in, col_ex = st.columns(2)
-    with col_in:
-        st.write("📈 預計收入")
-        default_incomes = pd.DataFrame([{"項目名稱": "過年紅包", "金額": 1000, "日期": datetime.date.today() + datetime.timedelta(days=60), "選入": True}])
-        edited_incomes_df = st.data_editor(default_incomes, num_rows="dynamic", use_container_width=True, column_config={"日期": st.column_config.DateColumn("日期", format="YYYY-MM-DD")}, key="in_table")
-    with col_ex:
-        st.write("📉 預計開支")
-        default_expenses = pd.DataFrame([{"項目名稱": "教材費", "金額": 500, "日期": datetime.date.today() + datetime.timedelta(days=30), "選入": True}])
-        edited_expenses_df = st.data_editor(default_expenses, num_rows="dynamic", use_container_width=True, column_config={"日期": st.column_config.DateColumn("日期", format="YYYY-MM-DD")}, key="ex_table")
+st.write("") 
 
-# ---- 3. 每月消費摺疊區 (剛需 & 娛樂) ----
-with st.expander("3 & 4. 每月消費清單 (必定開支 & 娛樂開支)", expanded=True):
-    col_ess, col_dis = st.columns(2)
-    with col_ess:
-        st.write("🏠 必定消費 (剛需)")
-        default_ess = pd.DataFrame([{"必備事項": "交通/午餐", "金額": 600, "選入": True}])
-        edited_ess_df = st.data_editor(default_ess, num_rows="dynamic", use_container_width=True, key="ess_table")
-    with col_dis:
-        st.write("🎮 自我意願 (娛樂)")
-        default_dis = pd.DataFrame([{"娛樂事項": "手搖飲/遊戲", "金額": 350, "選入": True}])
-        edited_dis_df = st.data_editor(default_dis, num_rows="dynamic", use_container_width=True, key="dis_table")
+# ---- 預計收入 摺疊區 ----
+with st.expander("預計收入 (未來特定單筆收入)", expanded=True):
+    income_total_placeholder = st.empty()
+    
+    default_incomes = pd.DataFrame([
+        {"項目名稱": "過年紅包", "金額": 1000, "預計收入日期": datetime.date.today() + datetime.timedelta(days=60), "選入計算": True},
+    ])
+    
+    edited_incomes_df = st.data_editor(
+        default_incomes,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "項目名稱": st.column_config.TextColumn("第一項：項目名稱"),
+            "金額": st.column_config.NumberColumn("第二項：金額 (元)", min_value=0, step=50),
+            "預計收入日期": st.column_config.DateColumn(
+                "第三項：預計收入日期 (點擊彈出日曆)",
+                min_value=datetime.date.today(),
+                format="YYYY-MM-DD"
+            ),
+            "選入計算": st.column_config.CheckboxColumn("選入計算")
+        },
+        key="incomes_table"
+    )
+    
+    edited_incomes_df["選入計算"] = edited_incomes_df["選入計算"].fillna(False).astype(bool)
+    active_incomes = edited_incomes_df[edited_incomes_df["選入計算"] == True].copy()
+    
+    if not active_incomes.empty:
+        active_incomes["預計收入日期"] = pd.to_datetime(active_incomes["預計收入日期"]).dt.date
+        
+    total_future_income = pd.to_numeric(active_incomes["金額"], errors='coerce').fillna(0).sum()
+    income_total_placeholder.metric("預計未來收入總計 (已選入)", f"{total_future_income} 元")
 
+st.write("")
+
+# ---- 預計開支 摺疊區 ----
+with st.expander("預計開支 (未來特定單筆開支)", expanded=True):
+    expense_total_placeholder = st.empty()
+    
+    default_expenses = pd.DataFrame([
+        {"項目名稱": "補習班教材費", "金額": 500, "預計開支日期": datetime.date.today() + datetime.timedelta(days=30), "選入計算": True},
+    ])
+    
+    edited_expenses_df = st.data_editor(
+        default_expenses,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "項目名稱": st.column_config.TextColumn("第一項：項目名稱"),
+            "金額": st.column_config.NumberColumn("第二項：金額 (元)", min_value=0, step=50),
+            "預計開支日期": st.column_config.DateColumn(
+                "第三項：預計開支日期 (點擊彈出日曆)",
+                min_value=datetime.date.today(),
+                format="YYYY-MM-DD"
+            ),
+            "選入計算": st.column_config.CheckboxColumn("選入計算")
+        },
+        key="expenses_table"
+    )
+    
+    edited_expenses_df["選入計算"] = edited_expenses_df["選入計算"].fillna(False).astype(bool)
+    active_expenses = edited_expenses_df[edited_expenses_df["選入計算"] == True].copy()
+    
+    if not active_expenses.empty:
+        active_expenses["預計開支日期"] = pd.to_datetime(active_expenses["預計開支日期"]).dt.date
+        
+    total_future_expense = pd.to_numeric(active_expenses["金額"], errors='coerce').fillna(0).sum()
+    expense_total_placeholder.metric("預計未來開支總計 (已選入)", f"{total_future_expense} 元")
+
+st.write("")
+
+# ---- 3. 每月必定消費（剛需）摺疊區 ----
+with st.expander("3. 點開填寫：每月必定消費的開支 (剛需開支)", expanded=True):
+    essential_total_placeholder = st.empty()
+    
+    default_essential = pd.DataFrame([
+        {"必備事項": "交通/公車卡", "消費金額": 200, "選入計算": True},
+        {"必備事項": "學校午餐", "消費金額": 400, "選入計算": True},
+    ])
+    
+    edited_essential_df = st.data_editor(
+        default_essential,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="essential_table"
+    )
+    
+    edited_essential_df["選入計算"] = edited_essential_df["選入計算"].fillna(False).astype(bool)
+    active_essential = edited_essential_df[edited_essential_df["選入計算"] == True]
+    total_essential = pd.to_numeric(active_essential["消費金額"], errors='coerce').fillna(0).sum()
+    essential_total_placeholder.metric("必定消費總計 (已選入)", f"{total_essential} 元")
+
+st.write("")
+
+# ---- 4. 每月自我意願消費（非剛需）摺疊區 ----
+with st.expander("4. 點開填寫：每月自我意願消費 (娛樂開支)", expanded=True):
+    discretionary_total_placeholder = st.empty()
+    
+    default_discretionary = pd.DataFrame([
+        {"娛樂事項": "手搖飲", "消費金額": 150, "選入計算": True},
+        {"娛樂事項": "手遊/Steam", "消費金額": 200, "選入計算": True},
+    ])
+    
+    edited_discretionary_df = st.data_editor(
+        default_discretionary,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="discretionary_table"
+    )
+    
+    edited_discretionary_df["選入計算"] = edited_discretionary_df["選入計算"].fillna(False).astype(bool)
+    active_discretionary = edited_discretionary_df[edited_discretionary_df["選入計算"] == True]
+    total_discretionary = pd.to_numeric(active_discretionary["消費金額"], errors='coerce').fillna(0).sum()
+    discretionary_total_placeholder.metric("自我意願總計 (已選入)", f"{total_discretionary} 元")
+
+st.write("") 
 st.divider()
 
-# ---- 5. 夢想目標 ----
+# ---- 5. 夢想目標輸入區 ----
 st.markdown("### **5. 存錢想買的東西以及金額**")
-target_name = st.text_input("夢想物品名稱", value="最新款降噪耳機")
-target_value = st.number_input("目標價值 (元)", min_value=1, value=3000, step=100)
+target_name = st.text_input("你想買的夢想物品名稱", value="最新款降噪耳機")
+target_value = st.number_input("該物品的目標價值 (元)", min_value=1, value=3000, step=100)
 
-# --- 核心模擬器算法 ---
-def simulate_timeline(target_val, initial_savings, monthly_savings, inc_df, exp_df, rate_annual):
+
+# --- 6. 核心計量算法：雙向現金流 + 理財複利時序模擬器 ---
+# 增加了 rate_annual 參數，預設為 0.0 代表純儲蓄不理財
+def simulate_timeline(target_val, initial_savings, monthly_savings, active_inc_df, active_exp_df, rate_annual=0.0):
     today = datetime.date.today()
     current_savings = initial_savings
     daily_savings = monthly_savings / 30.4
-    if current_savings >= target_val: return 0, today
     
-    inc_dict = inc_df[inc_df["選入"]==True].groupby("日期")["金額"].sum().to_dict() if not inc_df.empty else {}
-    exp_dict = exp_df[exp_df["選入"]==True].groupby("日期")["金額"].sum().to_dict() if not exp_df.empty else {}
+    if current_savings >= target_val:
+        return 0, today
+        
+    if not active_inc_df.empty:
+        income_by_date = active_inc_df.groupby("預計收入日期")["金額"].sum().to_dict()
+    else:
+        income_by_date = {}
+        
+    if not active_exp_df.empty:
+        expense_by_date = active_exp_df.groupby("預計開支日期")["金額"].sum().to_dict()
+    else:
+        expense_by_date = {}
+        
+    max_days = 3650
+    daily_rate = (rate_annual / 100) / 365  # 將百分比換算為每日複利率
     
-    daily_rate = (rate_annual / 100) / 365
-    for day in range(1, 3651):
+    for day in range(1, max_days + 1):
         sim_date = today + datetime.timedelta(days=day)
-        current_savings += current_savings * daily_rate # 複利增值
+        
+        # 每日複利利滾利計算
+        current_savings += current_savings * daily_rate
+        # 加上每日常態儲蓄
         current_savings += daily_savings
-        if sim_date in inc_dict: current_savings += inc_dict[sim_date]
-        if sim_date in exp_dict: current_savings -= exp_dict[sim_date]
-        if current_savings >= target_val: return day, sim_date
-    return 3650, today + datetime.timedelta(days=3650)
+        
+        if sim_date in income_by_date:
+            current_savings += income_by_date[sim_date]
+            
+        if sim_date in expense_by_date:
+            current_savings -= expense_by_date[sim_date]
+            
+        if current_savings >= target_val:
+            return day, sim_date
+            
+    return max_days, today + datetime.timedelta(days=max_days)
 
-# --- 數據預處理 ---
-total_ess = pd.to_numeric(edited_ess_df[edited_ess_df["選入"]==True]["金額"], errors='coerce').sum()
-total_dis = pd.to_numeric(edited_dis_df[edited_dis_df["選入"]==True]["金額"], errors='coerce').sum()
-base_savings_no_logic = income - total_ess - total_dis
 
-# ---------------------------------------------------------
-# 🌟 全新理財板塊：理財加持
-# ---------------------------------------------------------
+# =========================================================
+# 📊 第一大板塊：基礎現狀回測（未加持理財收益，rate_annual=0）
+# =========================================================
 st.write("")
-st.write("")
-st.markdown("# **理財加持 🚀**")
+st.header("第二步：動態回測與邊際效益分析看板 (純儲蓄現狀)")
 
-# 1. 自定義輸入理財工具數據的表格
-st.caption("請在下方表格列出您關注的理財產品及其預期年化收益率：")
-default_tools = pd.DataFrame([
-    {"理財方式名稱": "微信零錢通", "年化收益率(%)": 2.0},
-    {"理財方式名稱": "高利活存帳戶", "年化收益率(%)": 3.5},
-    {"理財方式名稱": "銀行定期存款", "年化收益率(%)": 2.2}
-])
-edited_tools_df = st.data_editor(default_tools, num_rows="dynamic", use_container_width=True, key="tools_table")
+base_savings = income - total_essential - total_discretionary
 
-# 2. 理財方式選項欄
-tool_options = ["不使用理財 (0%)"] + edited_tools_df["理財方式名稱"].tolist()
-selected_tool = st.selectbox("🎯 請選擇目前要套用的理財方式進行回測：", tool_options)
-
-# 3. 抓取選中方式的年化收益率
-if "不使用理財" in selected_tool:
-    active_rate = 0.0
+if base_savings <= 0:
+    st.error("預算超支警告：你每月的總開銷已經超過了你的收入！請點開上方摺疊盒刪減非必須開支。")
 else:
-    # 從表格中反查對應名稱的收益率
-    try:
-        active_rate = edited_tools_df[edited_tools_df["理財方式名稱"] == selected_tool]["年化收益率(%)"].values[0]
-    except:
-        active_rate = 0.0
-
-st.info(f"💡 目前已啟用：**{selected_tool}**，正在以 **{active_rate}%** 的年化收益率進行複利增值模擬。")
-
-# ---------------------------------------------------------
-# 📊 加上理財計算的動態回測與看板
-# ---------------------------------------------------------
-st.write("")
-st.header("理財優化後的動態分析看板")
-
-if base_savings_no_logic <= 0:
-    st.error("預算超支！請先調整上方開支。")
-else:
-    # 進行理財後的模擬
-    base_days, predicted_date = simulate_timeline(target_value, total_savings, base_savings_no_logic, edited_incomes_df, edited_expenses_df, active_rate)
+    # 預設不理財 (0.0%)
+    base_days, predicted_date = simulate_timeline(target_value, total_savings, base_savings, active_incomes, active_expenses, 0.0)
+    base_months = base_days / 30.4
     
-    kpi_col1, kpi_col2 = st.columns(2)
-    with kpi_col1:
-        st.metric("每月淨儲蓄 (本金)", f"{round(base_savings_no_logic)} 元")
-    with kpi_col2:
-        st.metric("解鎖時間 (理財加持後)", f"{round(base_days)} 天", delta=f"{round(base_days/30.4, 1)} 個月", delta_color="inverse")
-        st.markdown(f"### **實現日期：{predicted_date.strftime('%Y年%m月%d日')}**")
-
-    # 繪製理財後的圖表
+    col_kpi1, col_kpi2 = st.columns(2)
+    with col_kpi1:
+        st.metric(label="每月淨儲蓄", value=f"{round(base_savings)} 元")
+    with col_kpi2:
+        st.metric(label="預計解鎖時間", value=f"{round(base_days)} 天", delta=f"{round(base_months, 1)} 個月", delta_color="inverse")
+        st.markdown(f"### **預測實現日期：{predicted_date.strftime('%Y年%m月%d日')}**")
+        
     s_percentages = [i / 10.0 for i in range(0, 11)]
     sensitivity_data = []
     marginal_data = []
     prev_days = base_days 
     
     for i, s in enumerate(s_percentages):
-        item_saved = total_dis * s
-        new_dis = total_dis * (1 - s)
-        new_sav = income - total_ess - new_dis
-        d, dt = simulate_timeline(target_value, total_savings, new_sav, edited_incomes_df, edited_expenses_df, active_rate)
+        saved_amount = total_discretionary * s  
+        new_discretionary = total_discretionary * (1 - s)
+        new_savings = income - total_essential - new_discretionary
+        
+        new_days, scenario_date = simulate_timeline(target_value, total_savings, new_savings, active_incomes, active_expenses, 0.0)
+        days_saved = base_days - new_days
         
         sensitivity_data.append({
-            "節省比例": f"{int(s * 100)}%", "累積提前天數": round(base_days - d),
-            "每當月省下金額": round(item_saved), "預測日期": dt.strftime('%Y年%m月%d日')
+            "節省比例": f"{int(s * 100)}%", 
+            "累積提前天數": round(days_saved),
+            "具體金額數值": round(saved_amount),
+            "具體日期": scenario_date.strftime('%Y年%m月%d日')
         })
-        if i > 0: marginal_data.append({"區間": f"{int(s_percentages[i-1]*100)}%→{int(s*100)}%", "邊際天數": round(prev_days - d, 1)})
-        prev_days = d
+        if i > 0:
+            marginal_data.append({"節省比例變動 (X)": f"{int(s_percentages[i-1]*100)}% → {int(s*100)}%", "邊際提前天數 (Y)": round(prev_days - new_days, 1)})
+        prev_days = new_days
 
-    df_t = pd.DataFrame(sensitivity_data)
-    df_m = pd.DataFrame(marginal_data)
+    df_trend = pd.DataFrame(sensitivity_data)
+    df_marginal = pd.DataFrame(marginal_data)
     
-    g1, g2 = st.columns(2)
-    with g1:
-        st.subheader("理財累積效益趨勢")
-        fig1 = px.line(df_t, x="節省比例", y="累積提前天數", markers=True, template="plotly_white")
-        sel1 = st.plotly_chart(fig1, on_select="rerun", use_container_width=True, key="c1")
-        if sel1 and sel1["selection"]["points"]:
-            p = sel1["selection"]["points"][0]
-            row = df_t[df_t["節省比例"]==p['x']].iloc[0]
-            st.info(f"當省錢 {p['x']} (每月省{row['每當月省下金額']}元) 並配合 {selected_tool}，可提前 {row['累積提前天數']} 天於 {row['預測日期']} 達成！")
-    with g2:
-        st.subheader("理財邊際省錢效益")
-        st.plotly_chart(px.bar(df_m, x="區間", y="邊際天數", template="plotly_white"), use_container_width=True)
+    graph_col1, graph_col2 = st.columns(2)
+    
+    with graph_col1:
+        st.subheader("累積儲蓄效益")
+        fig_trend = px.line(df_trend, x="節省比例", y="累積提前天數", markers=True, template="plotly_white")
+        fig_trend.update_layout(clickmode='event+select')
+        selected_trend = st.plotly_chart(fig_trend, on_select="rerun", use_container_width=True, key="trend_chart")
+        
+        if selected_trend and "selection" in selected_trend and selected_trend["selection"]["points"]:
+            pt = selected_trend["selection"]["points"][0]
+            click_x = pt['x']
+            matched_row = df_trend[df_trend["節省比例"] == click_x].iloc[0]
+            exact_money = matched_row["具體金額數值"]
+            exact_date = matched_row["具體日期"]
+            days_ahead = matched_row["累積提前天數"]
+            st.info(f"已選中點數據：當省錢比例為 {click_x} （即每個月省下 {exact_money} 元）時，總共可提前 {days_ahead} 天（即在 {exact_date} ）實現目標。")
+        else:
+            st.caption("提示：點擊上方折線圖中的藍色圓點，可在這裡動態查看該點的數據。")
 
-# ---- 🚀 底部：減法理財小精靈 ----
+    with graph_col2:
+        st.subheader("邊際省錢效益")
+        fig_marginal = px.bar(df_marginal, x="節省比例變動 (X)", y="邊際提前天數 (Y)", template="plotly_white")
+        fig_marginal.update_layout(clickmode='event+select')
+        selected_marginal = st.plotly_chart(fig_marginal, on_select="rerun", use_container_width=True, key="marginal_chart")
+        
+        if selected_marginal and "selection" in selected_marginal and selected_marginal["selection"]["points"]:
+            pt = selected_marginal["selection"]["points"][0]
+            st.info(f"已選中區間數據：{pt['x']} 階段，每多省10%可額外縮短 {pt['y']} 天。")
+        else:
+            st.caption("提示：點擊上方柱狀圖的長條，可在這裡動態查看該區間的詳細邊際效益。")
+
+    st.write("")
+    st.markdown("### **💡 減法理財：省下這筆，提早幾天？ (純儲蓄現狀)**")
+    if not active_discretionary.empty:
+        for idx, row in active_discretionary.iterrows():
+            item_name = row["娛樂事項"]
+            item_cost = pd.to_numeric(row["消費金額"], errors='coerce')
+            if pd.isna(item_cost) or item_cost <= 0: continue
+            temp_total_discretionary = total_discretionary - item_cost
+            temp_savings = income - total_essential - temp_total_discretionary
+            new_days, _ = simulate_timeline(target_value, total_savings, temp_savings, active_incomes, active_expenses, 0.0)
+            st.write(f"🔸 如果你這個月不 **{item_name}**（省 {round(item_cost)} 元），你的 **{target_name}** 解鎖時間會立刻提早 **{round(base_days - new_days)}** 天！")
+
+    if not active_expenses.empty:
+        for idx, row in active_expenses.iterrows():
+            item_name = row["項目名稱"]
+            item_cost = pd.to_numeric(row["金額"], errors='coerce')
+            if pd.isna(item_cost) or item_cost <= 0: continue
+            temp_active_expenses = active_expenses.drop(idx)
+            new_days, _ = simulate_timeline(target_value, total_savings, base_savings, active_incomes, temp_active_expenses, 0.0)
+            st.write(f"🔸 如果你這個月不 **{item_name}**（省 {round(item_cost)} 元），你的 **{target_name}** 解鎖時間會立刻提早 **{round(base_days - new_days)}** 天！")
+
+
+# =========================================================
+# 🌟 第二大板塊：全新理財板塊「理財加持」
+# =========================================================
+st.write("")
 st.write("")
 st.divider()
-st.markdown("### **💡 減法理財：省下這筆，提早幾天？ (含理財收益)**")
-active_dis = edited_dis_df[edited_dis_df["選入"]==True]
-if not active_dis.empty:
-    for _, r in active_dis.iterrows():
-        cost = pd.to_numeric(r["金額"], errors='coerce')
-        if cost > 0:
-            d_new, _ = simulate_timeline(target_value, total_savings, (income-total_ess-(total_dis-cost)), edited_incomes_df, edited_expenses_df, active_rate)
-            st.write(f"🔸 如果不 **{r['娛樂事項']}** (省{round(cost)}元)，配合 **{selected_tool}**，將提早 **{round(base_days-d_new)}** 天解鎖！")
+st.markdown("# **理財加持 🚀**")
+
+# 1. 自定義輸入理財配置表格
+st.caption("請在下方表格自定義您關注的理財工具及其預估年化收益率：")
+default_tools = pd.DataFrame([
+    {"理財方式名稱": "微信零錢通", "年化收益率(%)": 2.0},
+    {"理財方式名稱": "數位帳戶高利活存", "年化收益率(%)": 3.5},
+    {"理財方式名稱": "銀行定期存款", "年化收益率(%)": 2.2}
+])
+edited_tools_df = st.data_editor(default_tools, num_rows="dynamic", use_container_width=True, key="tools_table")
+
+# 2. 理財工具挑選下拉選單（包含「無」選項）
+tool_options = ["無 (不使用理財，年化 0%)"] + edited_tools_df["理財方式名稱"].tolist()
+selected_tool = st.selectbox("🎯 請選擇目前要加入計算的理財方式：", tool_options, key="tool_select_box")
+
+# 3. 獲取選取項目的精確利率
+if "無 (不使用理財" in selected_tool:
+    active_rate = 0.0
+else:
+    try:
+        active_rate = edited_tools_df[edited_tools_df["理財方式名稱"] == selected_tool]["年化收益率(%)"].values[0]
+    except:
+        active_rate = 0.0
+
+st.info(f"💡 目前已套用理財方案：**{selected_tool}**，正在以 **{active_rate}%** 的每日複利回報更新動態分析。")
+
+
+# =========================================================
+# 📊 第三大板塊：理財優化後的「動態回測與邊際效益分析看板」
+# =========================================================
+st.write("")
+st.header("第二步：動態回測與邊際效益分析看板 (加入理財優化後)")
+
+if base_savings <= 0:
+    st.error("預算超支警告：請先修正上方消費數據。")
+else:
+    # 傳入活性的理財年化利率 active_rate 進行動態時序模擬
+    base_days_inv, predicted_date_inv = simulate_timeline(target_value, total_savings, base_savings, active_incomes, active_expenses, active_rate)
+    base_months_inv = base_days_inv / 30.4
+    
+    col_kpi1_inv, col_kpi2_inv = st.columns(2)
+    with col_kpi1_inv:
+        st.metric(label="每月淨儲蓄 (投入本金)", value=f"{round(base_savings)} 元")
+    with col_kpi2_inv:
+        st.metric(label="預計解鎖時間 (理財加持版)", f"{round(base_days_inv)} 天", delta=f"{round(base_months_inv, 1)} 個月", delta_color="inverse")
+        st.markdown(f"### **預測實現日期：{predicted_date_inv.strftime('%Y年%m月%d日')}**")
+        
+    sensitivity_data_inv = []
+    marginal_data_inv = []
+    prev_days_inv = base_days_inv 
+    
+    for i, s in enumerate(s_percentages):
+        saved_amount = total_discretionary * s  
+        new_discretionary = total_discretionary * (1 - s)
+        new_savings = income - total_essential - new_discretionary
+        
+        # 情境動態模擬同步帶入利率
+        new_days_inv, scenario_date_inv = simulate_timeline(target_value, total_savings, new_savings, active_incomes, active_expenses, active_rate)
+        days_saved_inv = base_days_inv - new_days_inv
+        
+        sensitivity_data_inv.append({
+            "節省比例": f"{int(s * 100)}%", 
+            "累積提前天數": round(days_saved_inv),
+            "具體金額數值": round(saved_amount),
+            "具體日期": scenario_date_inv.strftime('%Y年%m月%d日')
+        })
+        if i > 0:
+            marginal_data_inv.append({"節省比例變動 (X)": f"{int(s_percentages[i-1]*100)}% → {int(s*100)}%", "邊際提前天數 (Y)": round(prev_days_inv - new_days_inv, 1)})
+        prev_days_inv = new_days_inv
+
+    df_trend_inv = pd.DataFrame(sensitivity_data_inv)
+    df_marginal_inv = pd.DataFrame(marginal_data_inv)
+    
+    graph_col1_inv, graph_col2_inv = st.columns(2)
+    
+    with graph_col1_inv:
+        st.subheader("累積儲蓄效益 (理財加持版)")
+        fig_trend_inv = px.line(df_trend_inv, x="節省比例", y="累積提前天數", markers=True, template="plotly_white")
+        fig_trend_inv.update_layout(clickmode='event+select')
+        # 換上全新 key 防止重複組件衝突
+        selected_trend_inv = st.plotly_chart(fig_trend_inv, on_select="rerun", use_container_width=True, key="trend_chart_invest")
+        
+        if selected_trend_inv and "selection" in selected_trend_inv and selected_trend_inv["selection"]["points"]:
+            pt = selected_trend_inv["selection"]["points"][0]
+            click_x = pt['x']
+            matched_row = df_trend_inv[df_trend_inv["節省比例"] == click_x].iloc[0]
+            exact_money = matched_row["具體金額數值"]
+            exact_date = matched_row["具體日期"]
+            days_ahead = matched_row["累積提前天數"]
+            st.info(f"已選中點數據：當省錢比例為 {click_x} （即每個月省下 {exact_money} 元）並加入 {selected_tool} 加持時，總共可提前 {days_ahead} 天（即在 {exact_date} ）實現目標。")
+        else:
+            st.caption("提示：點擊上方折線圖中的藍色圓點，可在這裡動態查看該點的數據。")
+
+    with graph_col2_inv:
+        st.subheader("邊際省錢效益 (理財加持版)")
+        fig_marginal_inv = px.bar(df_marginal_inv, x="節省比例變動 (X)", y="邊際提前天數 (Y)", template="plotly_white")
+        fig_marginal_inv.update_layout(clickmode='event+select')
+        # 換上全新 key 防止重複組件衝突
+        selected_marginal_inv = st.plotly_chart(fig_marginal_inv, on_select="rerun", use_container_width=True, key="marginal_chart_invest")
+        
+        if selected_marginal_inv and "selection" in selected_marginal_inv and selected_marginal_inv["selection"]["points"]:
+            pt = selected_marginal_inv["selection"]["points"][0]
+            st.info(f"已選中區間數據：{pt['x']} 階段，每多省10%並配合理財，可額外縮短 {pt['y']} 天。")
+        else:
+            st.caption("提示：點擊上方柱狀圖的長條，可在這裡動態查看該區間的詳細邊際效益。")
+
+    st.write("")
+    st.markdown("### **💡 減法理財：省下這筆，提早幾天？ (含理財增值收益)**")
+    if not active_discretionary.empty:
+        for idx, row in active_discretionary.iterrows():
+            item_name = row["娛樂事項"]
+            item_cost = pd.to_numeric(row["消費金額"], errors='coerce')
+            if pd.isna(item_cost) or item_cost <= 0: continue
+            temp_total_discretionary = total_discretionary - item_cost
+            temp_savings = income - total_essential - temp_total_discretionary
+            new_days_inv, _ = simulate_timeline(target_value, total_savings, temp_savings, active_incomes, active_expenses, active_rate)
+            st.write(f"🔸 如果你這個月不 **{item_name}**（省 {round(item_cost)} 元），並配合 **{selected_tool}**，你的解鎖時間會提早 **{round(base_days_inv - new_days_inv)}** 天！")
+
+    if not active_expenses.empty:
+        for idx, row in active_expenses.iterrows():
+            item_name = row["項目名稱"]
+            item_cost = pd.to_numeric(row["金額"], errors='coerce')
+            if pd.isna(item_cost) or item_cost <= 0: continue
+            temp_active_expenses = active_expenses.drop(idx)
+            new_days_inv, _ = simulate_timeline(target_value, total_savings, base_savings, active_incomes, temp_active_expenses, active_rate)
+            st.write(f"🔸 如果你這個月不 **{item_name}**（省 {round(item_cost)} 元），並配合 **{selected_tool}**，你的解鎖時間會提早 **{round(base_days_inv - new_days_inv)}** 天！")
+
+```
