@@ -157,6 +157,7 @@ st.divider()
 st.markdown("### **5. 存錢想買的東西以及金額**")
 target_name = st.text_input("你想買的夢想物品名稱", value="最新款降噪耳機")
 target_value = st.number_input("該物品的目標價值 (元)", min_value=1, value=3000, step=100)
+custom_target_value = st.number_input("👉 另外想測試的自定義儲存金額 (元，不測試請設為 0)", min_value=0, value=0, step=500, key="custom_target_input")
 
 
 # --- 6. 核心計量算法：雙向現金流 + 理財複利時序模擬器 ---
@@ -217,8 +218,12 @@ else:
     with col_kpi1:
         st.metric(label="每月淨儲蓄", value=f"{round(base_savings)} 元")
     with col_kpi2:
-        st.metric(label="預計解鎖時間", value=f"{round(base_days)} 天", delta=f"{round(base_months, 1)} 個月", delta_color="inverse")
+        st.metric(label="預計解鎖時間", value=f"{round(base_days)} 天 ({round(base_months, 1)} 個月)")
         st.markdown(f"### **預測實現日期：{predicted_date.strftime('%Y年%m月%d日')}**")
+    
+    if custom_target_value > 0:
+        cust_days_base, cust_date_base = simulate_timeline(custom_target_value, total_savings, base_savings, active_incomes, active_expenses, 0.0)
+        st.write(f"✨ **自定義金額儲蓄時間**：儲存滿 **{custom_target_value}** 元預計需要 **{cust_days_base}** 天（預計於 {cust_date_base.strftime('%Y年%m月%d日')} 達成）。")
         
     s_percentages = [i / 10.0 for i in range(0, 11)]
     sensitivity_data = []
@@ -326,11 +331,11 @@ else:
     except:
         active_rate = 0.0
 
-st.info(f"💡 目前已套用理財方案：**{selected_tool}**，正在以 **{active_rate}%** 的每日複利回報更新動態分析。")
+st.info(f"💡 目前已套用理財方案：**{selected_tool}**，正在以 **{active_rate}%** 的每日每日複利回報更新動態分析。")
 
 
 # =========================================================
-# 📊 第三大板塊：理財優化後的「動態回測與邊際效益分析看板」
+# 📊 第三大板塊：理財優化後的分析看板 + 🌟 全新「時間軸存錢指南」
 # =========================================================
 st.write("")
 st.header("第二步：動態回測與邊際效益分析看板 (加入理財優化後)")
@@ -340,14 +345,107 @@ if base_savings <= 0:
 else:
     base_days_inv, predicted_date_inv = simulate_timeline(target_value, total_savings, base_savings, active_incomes, active_expenses, active_rate)
     base_months_inv = base_days_inv / 30.4
+    days_improved = base_days - base_days_inv
     
     col_kpi1_inv, col_kpi2_inv = st.columns(2)
     with col_kpi1_inv:
         st.metric(label="每月淨儲蓄 (投入本金)", value=f"{round(base_savings)} 元")
     with col_kpi2_inv:
-        st.metric(label="預計解鎖時間 (理財加持版)", value=f"{round(base_days_inv)} 天", delta=f"{round(base_months_inv, 1)} 個月", delta_color="inverse")
+        st.metric(
+            label="預計解鎖時間 (理財加持版)", 
+            value=f"{round(base_days_inv)} 天 ({round(base_months_inv, 1)} 個月)", 
+            delta=f"比純儲蓄縮短 {round(days_improved)} 天" if days_improved > 0 else "與純儲蓄持平", 
+            delta_color="inverse"
+        )
         st.markdown(f"### **預測實現日期：{predicted_date_inv.strftime('%Y年%m月%d日')}**")
         
+    if custom_target_value > 0:
+        cust_days_base, _ = simulate_timeline(custom_target_value, total_savings, base_savings, active_incomes, active_expenses, 0.0)
+        cust_days_inv, cust_date_inv = simulate_timeline(custom_target_value, total_savings, base_savings, active_incomes, active_expenses, active_rate)
+        cust_improved = cust_days_base - cust_days_inv
+        st.write(f"✨ **自定義金額儲蓄時間 (理財加持版)**：儲存滿 **{custom_target_value}** 元需要 **{cust_days_inv}** 天（預計於 {cust_date_inv.strftime('%Y年%m月%d日')} 達成），**比不理財提早了 {round(cust_improved)} 天！**")
+
+    # ---------------------------------------------------------
+    # ⏳ 全新嵌入功能：根據時間軸的「專屬理財里程碑存錢指南」
+    # ---------------------------------------------------------
+    with st.expander(f"⏳ 您的專屬理財時間軸指南 (套用：{selected_tool})", expanded=True):
+        st.caption("後台模擬器已為您生成從今天開始到達成目標的關鍵財務里程碑節點：")
+        
+        # 準備未來單筆現金流字典
+        inc_by_date_guide = active_incomes.groupby("預計收入日期")["金額"].sum().to_dict() if not active_incomes.empty else {}
+        exp_by_date_guide = active_expenses.groupby("預計開支日期")["金額"].sum().to_dict() if not active_expenses.empty else {}
+        
+        today_g = datetime.date.today()
+        current_savings_g = total_savings
+        daily_savings_g = base_savings / 30.4
+        daily_rate_g = (active_rate / 100) / 365
+        
+        guide_records = []
+        # 起點記錄
+        guide_records.append({
+            "預計日期": today_g.strftime('%Y年%m月%d日'),
+            "計畫階段": "🏁 計畫起點 (今天)",
+            "本息預估累積": f"{round(current_savings_g)} 元",
+            "生活與理財指南行動提示": "理財帳戶已開通！保持日常開支自律，讓省下的每一塊錢天天滾動利息。"
+        })
+        
+        hit_50_g = False
+        
+        # 開啟日級高精準時序追蹤
+        for day in range(1, 3651):
+            sim_date_g = today_g + datetime.timedelta(days=day)
+            
+            # 每日利滾利收益
+            current_savings_g += current_savings_g * daily_rate_g
+            # 加上常態儲蓄
+            current_savings_g += daily_savings_g
+            
+            triggered = False
+            desc = ""
+            # 捕捉單筆大額流動
+            if sim_date_g in inc_by_date_guide:
+                current_savings_g += inc_by_date_guide[sim_date_g]
+                triggered = True
+                desc = "💰 預期單筆收入注入（如紅包或獎學金），本金基數擴大，複利踩油門！"
+            if sim_date_g in exp_by_date_guide:
+                current_savings_g -= exp_by_date_guide[sim_date_g]
+                triggered = True
+                desc = "🚨 預期單筆大開支扣除！請確保這幾天理財帳戶有足夠隨時轉出的餘額應付。"
+                
+            # 捕捉 50% 核心節點
+            if current_savings_g >= (target_value * 0.5) and not hit_50_g and current_savings_g < target_value:
+                hit_50_g = True
+                guide_records.append({
+                    "預計日期": sim_date_g.strftime('%Y年%m月%d日'),
+                    "計畫階段": "🎯 進度過半 (50%)",
+                    "本息預估累積": f"{round(current_savings_g)} 元",
+                    "生活與理財指南行動提示": "進度過半！此時每天產生的理財收益開始變得有感，請繼續堅持！"
+                })
+                
+            if triggered:
+                guide_records.append({
+                    "預計日期": sim_date_g.strftime('%Y年%m月%d日'),
+                    "計畫階段": "📅 現金流變動點",
+                    "本息預估累積": f"{round(current_savings_g)} 元",
+                    "生活與理財指南行動提示": desc
+                })
+                
+            # 捕捉 100% 終點節點
+            if current_savings_g >= target_value:
+                guide_records.append({
+                    "預計日期": sim_date_g.strftime('%Y年%m月%d日'),
+                    "計畫階段": "🎉 夢想達成 (100%)",
+                    "本息預估累積": f"{round(current_savings_g)} 元",
+                    "生活與理財指南行動提示": f"恭喜！成功存夠資金解鎖【{target_name}】！理財生錢幫你少走了一些冤枉路。"
+                })
+                break
+                
+        # 將整理好的時間軸指南以 scannable 的乾淨表格直接渲染
+        df_guide = pd.DataFrame(guide_records)
+        st.dataframe(df_guide, use_container_width=True, hide_index=True)
+
+    # ---------------------------------------------------------
+    
     sensitivity_data_inv = []
     marginal_data_inv = []
     prev_days_inv = base_days_inv 
@@ -367,7 +465,7 @@ else:
             "具體日期": scenario_date_inv.strftime('%Y年%m月%d日')
         })
         if i > 0:
-            marginal_data_inv.append({"節省比例變動 (X)": f"{int(s_percentages[i-1]*100)}% → {int(s*100)}%", "邊際提前天數 (Y)": round(prev_days_inv - new_days_inv, 1)})
+            marginal_data_inv.append({"節省比例變動 (X)": f"{int(s_percentages[i-1]*100)}% → {int(s*100)}%", "晚於此區間邊際天數 (Y)": round(prev_days_inv - new_days_inv, 1)})
         prev_days_inv = new_days_inv
 
     df_trend_inv = pd.DataFrame(sensitivity_data_inv)
@@ -394,7 +492,7 @@ else:
 
     with graph_col2_inv:
         st.subheader("邊際省錢效益 (理財加持版)")
-        fig_marginal_inv = px.bar(df_marginal_inv, x="節省比例變動 (X)", y="邊際提前天數 (Y)", template="plotly_white")
+        fig_marginal_inv = px.bar(df_marginal_inv, x="節省比例變動 (X)", y="晚於此區變邊際天數 (Y)", template="plotly_white")
         fig_marginal_inv.update_layout(clickmode='event+select')
         selected_marginal_inv = st.plotly_chart(fig_marginal_inv, on_select="rerun", use_container_width=True, key="marginal_chart_invest")
         
