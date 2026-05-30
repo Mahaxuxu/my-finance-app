@@ -1,18 +1,3 @@
-啊！這一次是我的鍋，我太興奮了！😂
-
-這個錯誤的原因是：你在複製程式碼時，不小心把我對你們的誇獎（「**沒問題！這個構想完全展現了真正的量化策略對比...**」）也一起貼進 `app.py` 的第一行了。Python 看到中文字和全角驚嘆號 `！`，直接嚇到當機報錯 `SyntaxError`。
-
-我們快點把這個「美麗的誤會」擦乾淨。請跟著我做最後一次最純淨的重貼：
-
----
-
-### 🛠️ 清空與精準重貼步驟
-
-1. 打開你的 `app.py`，按下 `Ctrl + A`（Mac 按 `Cmd + A`）全選。
-2. 按下 `Delete` 鍵**徹底清空，確保檔案變成完全空白的**。
-3. **只複製下方灰色框框內**的程式碼（千萬不要點到框框外面的文字喔！），貼進去並儲存：
-
-```python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -439,5 +424,3 @@ else:
             temp_active_expenses = active_expenses.drop(idx)
             new_days_inv, _ = simulate_timeline(target_value, total_savings, base_savings, active_incomes, temp_active_expenses, active_rate)
             st.write(f"🔸 如果你這個月不 **{item_name}**（省 {round(item_cost)} 元），並配合 **{selected_tool}**，你的解鎖時間會提早 **{round(base_days_inv - new_days_inv)}** 天！")
-
-```
