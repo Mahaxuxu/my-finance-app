@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import datetime  # 引入時間庫用於預測日期
 
 # --- 1. 網頁基本設定 ---
 st.set_page_config(page_title="中學生智慧理財系統", layout="wide")
@@ -50,7 +51,7 @@ with st.expander("3. 點開填寫：每月必定消費的開支 (剛需開支)",
     )
     
     edited_essential_df["選入計算"] = edited_essential_df["選入計算"].fillna(False).astype(bool)
-    active_essential = edited_essential_df[edited_essential_df["選入計算"] == True]
+    active_essential = edited_essential_df[edited_essential_df["消費金額"] == True]
     total_essential = pd.to_numeric(active_essential["消費金額"], errors='coerce').fillna(0).sum()
     essential_total_placeholder.metric("必定消費總計 (已選入)", f"{total_essential} 元")
 
@@ -98,16 +99,21 @@ else:
     if needed_amount <= 0:
         base_months = 0.0
         base_days = 0.0
+        predicted_date = datetime.date.today()
         st.success("目前選入的總存款已足夠購買此物品，無需額外等待儲蓄時間。")
     else:
         base_months = needed_amount / base_savings
         base_days = base_months * 30.4
+        # 計算預測日期：今天 + 需要等待的天數
+        predicted_date = datetime.date.today() + datetime.timedelta(days=int(base_days))
     
     col_kpi1, col_kpi2 = st.columns(2)
     with col_kpi1:
         st.metric(label="每月淨儲蓄", value=f"{round(base_savings)} 元")
     with col_kpi2:
         st.metric(label="預計解鎖時間", value=f"{round(base_days)} 天", delta=f"{round(base_months, 1)} 個月", delta_color="inverse")
+        # 在天數下方加粗顯示預測實現的精確日期
+        st.markdown(f"### **預測實現日期：{predicted_date.strftime('%Y年%m月%d日')}**")
         
     s_percentages = [i / 10.0 for i in range(0, 11)]
     sensitivity_data = []
@@ -135,9 +141,33 @@ else:
     df_marginal = pd.DataFrame(marginal_data)
     
     graph_col1, graph_col2 = st.columns(2)
+    
+    # ---- 左圖：趨勢折線圖與點擊事件監聽 ----
     with graph_col1:
         st.subheader("累積儲蓄效益")
-        st.plotly_chart(px.line(df_trend, x="節省比例", y="累積提前天數", markers=True, template="plotly_white"), use_container_width=True)
+        fig_trend = px.line(df_trend, x="節省比例", y="累積提前天數", markers=True, template="plotly_white")
+        fig_trend.update_layout(clickmode='event+select') # 啟用點擊選取模式
+        
+        # 使用 on_select="rerun" 監聽點擊動作
+        selected_trend = st.plotly_chart(fig_trend, on_select="rerun", use_container_width=True, key="trend_chart")
+        
+        # 判斷使用者是否有選取點
+        if selected_trend and "selection" in selected_trend and selected_trend["selection"]["points"]:
+            pt = selected_trend["selection"]["points"][0]
+            st.info(f"已選中點數據：當省錢比例為 {pt['x']} 時，總共可提前 {pt['y']} 天實現目標。")
+        else:
+            st.caption("提示：點擊上方折線圖中的藍色圓點，可在這裡動態查看該點的數據。")
+
+    # ---- 右圖：邊際柱狀圖與點擊事件監聽 ----
     with graph_col2:
         st.subheader("邊際省錢效益")
-        st.plotly_chart(px.bar(df_marginal, x="節省比例變動 (X)", y="邊際提前天數 (Y)", template="plotly_white"), use_container_width=True)
+        fig_marginal = px.bar(df_marginal, x="節省比例變動 (X)", y="邊際提前天數 (Y)", template="plotly_white")
+        fig_marginal.update_layout(clickmode='event+select')
+        
+        selected_marginal = st.plotly_chart(fig_marginal, on_select="rerun", use_container_width=True, key="marginal_chart")
+        
+        if selected_marginal and "selection" in selected_marginal and selected_marginal["selection"]["points"]:
+            pt = selected_marginal["selection"]["points"][0]
+            st.info(f"已選中區間數據：{pt['x']} 階段，每多省10%可額外縮短 {pt['y']} 天。")
+        else:
+            st.caption("提示：點擊上方柱狀圖的長條，可在這裡動態查看該區間的詳細邊際效益。")
