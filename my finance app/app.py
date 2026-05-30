@@ -70,7 +70,7 @@ with st.expander("預計收入 (未來特定單筆收入)", expanded=True):
 
 st.write("")
 
-# ---- 同理新增：預計開支 摺疊區 (內建日曆選擇器) ----
+# ---- 預計開支 摺疊區 ----
 with st.expander("預計開支 (未來特定單筆開支)", expanded=True):
     expense_total_placeholder = st.empty()
     
@@ -158,7 +158,7 @@ st.markdown("### **5. 存錢想買的東西以及金額**")
 target_name = st.text_input("你想買的夢想物品名稱", value="最新款降噪耳機")
 target_value = st.number_input("該物品的目標價值 (元)", min_value=1, value=3000, step=100)
 
-# --- 6. 核心計量算法：升級為雙向現金流時序模擬器 ---
+# --- 6. 核心計量算法：雙向現金流時序模擬器 ---
 def simulate_timeline(target_val, initial_savings, monthly_savings, active_inc_df, active_exp_df):
     today = datetime.date.today()
     current_savings = initial_savings
@@ -167,13 +167,11 @@ def simulate_timeline(target_val, initial_savings, monthly_savings, active_inc_d
     if current_savings >= target_val:
         return 0, today
         
-    # 建立收入字典
     if not active_inc_df.empty:
         income_by_date = active_inc_df.groupby("預計收入日期")["金額"].sum().to_dict()
     else:
         income_by_date = {}
         
-    # 建立開支字典
     if not active_exp_df.empty:
         expense_by_date = active_exp_df.groupby("預計開支日期")["金額"].sum().to_dict()
     else:
@@ -185,11 +183,9 @@ def simulate_timeline(target_val, initial_savings, monthly_savings, active_inc_d
         sim_date = today + datetime.timedelta(days=day)
         current_savings += daily_savings
         
-        # 捕捉當天是否有單筆收入注入
         if sim_date in income_by_date:
             current_savings += income_by_date[sim_date]
             
-        # 捕捉當天是否有單筆開支扣除
         if sim_date in expense_by_date:
             current_savings -= expense_by_date[sim_date]
             
@@ -198,7 +194,7 @@ def simulate_timeline(target_val, initial_savings, monthly_savings, active_inc_d
             
     return max_days, today + datetime.timedelta(days=max_days)
 
-# --- 7. 看板渲染 ---
+# --- 7. 看板與圖表渲染 ---
 st.write("")
 st.header("第二步：動態回測與邊際效益分析看板")
 
@@ -207,7 +203,6 @@ base_savings = income - total_essential - total_discretionary
 if base_savings <= 0:
     st.error("預算超支警告：你每月的總開銷已經超過了你的收入！請點開上方摺疊盒刪減非必須開支。")
 else:
-    # 將收入與開支同時傳入模擬器中
     base_days, predicted_date = simulate_timeline(target_value, total_savings, base_savings, active_incomes, active_expenses)
     base_months = base_days / 30.4
     
@@ -228,7 +223,6 @@ else:
         new_discretionary = total_discretionary * (1 - s)
         new_savings = income - total_essential - new_discretionary
         
-        # 不同省錢情境下同步加入雙向現金流模擬
         new_days, scenario_date = simulate_timeline(target_value, total_savings, new_savings, active_incomes, active_expenses)
         days_saved = base_days - new_days
         
@@ -247,33 +241,27 @@ else:
     
     graph_col1, graph_col2 = st.columns(2)
     
-    # ---- 左圖：累積儲蓄效益 ----
     with graph_col1:
         st.subheader("累積儲蓄效益")
         fig_trend = px.line(df_trend, x="節省比例", y="累積提前天數", markers=True, template="plotly_white")
         fig_trend.update_layout(clickmode='event+select')
-        
         selected_trend = st.plotly_chart(fig_trend, on_select="rerun", use_container_width=True, key="trend_chart")
         
         if selected_trend and "selection" in selected_trend and selected_trend["selection"]["points"]:
             pt = selected_trend["selection"]["points"][0]
             click_x = pt['x']
-            
             matched_row = df_trend[df_trend["節省比例"] == click_x].iloc[0]
             exact_money = matched_row["具體金額數值"]
             exact_date = matched_row["具體日期"]
             days_ahead = matched_row["累積提前天數"]
-            
             st.info(f"已選中點數據：當省錢比例為 {click_x} （即每個月省下 {exact_money} 元）時，總共可提前 {days_ahead} 天（即在 {exact_date} ）實現目標。")
         else:
             st.caption("提示：點擊上方折線圖中的藍色圓點，可在這裡動態查看該點的數據。")
 
-    # ---- 右圖：邊際省錢效益 ----
     with graph_col2:
         st.subheader("邊際省錢效益")
         fig_marginal = px.bar(df_marginal, x="節省比例變動 (X)", y="邊際提前天數 (Y)", template="plotly_white")
         fig_marginal.update_layout(clickmode='event+select')
-        
         selected_marginal = st.plotly_chart(fig_marginal, on_select="rerun", use_container_width=True, key="marginal_chart")
         
         if selected_marginal and "selection" in selected_marginal and selected_marginal["selection"]["points"]:
@@ -281,3 +269,42 @@ else:
             st.info(f"已選中區間數據：{pt['x']} 階段，每多省10%可額外縮短 {pt['y']} 天。")
         else:
             st.caption("提示：點擊上方柱狀圖的長條，可在這裡動態查看該區間的詳細邊際效益。")
+
+    # ---- 🚀 網頁最末尾：全新功能「減法理財小精靈」 ----
+    st.write("")
+    st.divider()
+    st.markdown("### **💡 減法理財：省下這筆，提早幾天？**")
+    st.caption("以下為針對您上方填寫的每一項『自我意願消費』與『預計開支』所做的獨立生活代價動態分析：")
+
+    # 1. 針對「每月自我意願消費」每一項進行回測
+    if not active_discretionary.empty:
+        for idx, row in active_discretionary.iterrows():
+            item_name = row["娛樂事項"]
+            item_cost = pd.to_numeric(row["消費金額"], errors='coerce')
+            if pd.isna(item_cost) or item_cost <= 0:
+                continue
+                
+            # 模擬：假裝省下這一項娛樂費
+            temp_total_discretionary = total_discretionary - item_cost
+            temp_savings = income - total_essential - temp_total_discretionary
+            new_days, _ = simulate_timeline(target_value, total_savings, temp_savings, active_incomes, active_expenses)
+            days_saved = base_days - new_days
+            
+            # 完美呈現使用者的指定格式
+            st.write(f"🔸 如果你這個月不 **{item_name}**（省 {round(item_cost)} 元），你的 **{target_name}** 解鎖時間會立刻提早 **{round(days_saved)}** 天！")
+
+    # 2. 針對「預計開支」每一項進行回測
+    if not active_expenses.empty:
+        for idx, row in active_expenses.iterrows():
+            item_name = row["項目名稱"]
+            item_cost = pd.to_numeric(row["金額"], errors='coerce')
+            if pd.isna(item_cost) or item_cost <= 0:
+                continue
+                
+            # 模擬：假裝這筆未來大開支被取消了
+            temp_active_expenses = active_expenses.drop(idx)
+            new_days, _ = simulate_timeline(target_value, total_savings, base_savings, active_incomes, temp_active_expenses)
+            days_saved = base_days - new_days
+            
+            # 同理完美呈現格式
+            st.write(f"🔸 如果你這個月不 **{item_name}**（省 {round(item_cost)} 元），你的 **{target_name}** 解鎖時間會立刻提早 **{round(days_saved)}** 天！")
