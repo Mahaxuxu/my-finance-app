@@ -34,7 +34,7 @@ with st.expander("2. 點開填寫：目前個人總存款 (元)", expanded=True)
 
 st.write("") 
 
-# ---- 預計收入 摺疊區 ----
+# ---- 預計收入 摺疊區 (已修復 TypeError 參數錯誤) ----
 with st.expander("預計收入 (未來特定單筆收入)", expanded=True):
     income_total_placeholder = st.empty()
     
@@ -42,19 +42,20 @@ with st.expander("預計收入 (未來特定單筆收入)", expanded=True):
         {"項目名稱": "過年紅包", "金額": 1000, "預計收入日期": datetime.date.today() + datetime.timedelta(days=60), "選入計算": True},
     ])
     
+    # 移除了引發錯誤的 placeholder 參數
     edited_incomes_df = st.data_editor(
         default_incomes,
         num_rows="dynamic",
         use_container_width=True,
         column_config={
-            "項目名稱": st.column_config.TextColumn("第一項：項目名稱", placeholder="例如：生日紅包、獎學金"),
+            "項目名稱": st.column_config.TextColumn("第一項：項目名稱"),
             "金額": st.column_config.NumberColumn("第二項：金額 (元)", min_value=0, step=50),
             "預計收入日期": st.column_config.DateColumn(
                 "第三項：預計收入日期 (點擊彈出日曆)",
                 min_value=datetime.date.today(),
                 format="YYYY-MM-DD"
             ),
-            "選入計算": st.column_config.CheckboxColumn("選入計算", default=True)
+            "選入計算": st.column_config.CheckboxColumn("選入計算")
         },
         key="incomes_table"
     )
