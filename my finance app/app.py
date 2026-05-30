@@ -6,7 +6,7 @@ import datetime
 # --- 1. 網頁基本設定 ---
 st.set_page_config(page_title="中學生智慧理財系統", layout="wide")
 
-# ---- 1. 零用錢收入配置 (預設初始化為：每周發放 300 元) ----
+# ---- 1. 零用錢收入配置 ----
 st.markdown("### **1. 零用錢收入配置**")
 col_freq, col_amt = st.columns([1, 2])
 
@@ -27,13 +27,13 @@ with col_amt:
 st.caption(f"系統後台已自動將其標準化換算為每月等值收入：約 {round(income)} 元")
 st.write("") 
 
-# ---- 2. 目前個人總存款 摺疊區 (預設初始化為：總計 8000 元大本金) ----
+# ---- 2. 目前個人總存款 摺疊區 ----
 with st.expander("2. 盤點現有存款現額 (活期與現金)", expanded=True):
     savings_total_placeholder = st.empty()
     
     default_savings = pd.DataFrame([
-        {"存款項目": "銀行/郵局帳戶", "金額": 7000, "選入計算": True},
-        {"存款項目": "存錢筒現鈔", "金額": 1000, "選入計算": True},
+        {"存款項目": "銀行賬戶", "金額": 7000, "選入計算": True},
+        {"存款項目": "微信餘額", "金額": 1000, "選入計算": True},
     ])
     
     edited_savings_df = st.data_editor(
@@ -50,7 +50,7 @@ with st.expander("2. 盤點現有存款現額 (活期與現金)", expanded=True)
 
 st.write("") 
 
-# ---- 預計收入 摺疊區 (預設初始化為：第 3 天極早期注入 3000 元紅包) ----
+# ---- 預計收入 摺疊區 ----
 with st.expander("未來預期單筆收入明細 (如紅包、獎學金)", expanded=True):
     income_total_placeholder = st.empty()
     
@@ -86,7 +86,7 @@ with st.expander("未來預期單筆收入明細 (如紅包、獎學金)", expan
 
 st.write("")
 
-# ---- 預計開支 摺疊區 (預設初始化為：30 天後扣除 500 元教材費) ----
+# ---- 預計開支 摺疊區 ----
 with st.expander("未來預期單筆大額開支明細 (如教材費、大宗購買)", expanded=True):
     expense_total_placeholder = st.empty()
     
@@ -122,12 +122,13 @@ with st.expander("未來預期單筆大額開支明細 (如教材費、大宗購
 
 st.write("")
 
-# ---- 3. 每月必定消費 摺疊區 (預設初始化為：必要生活開支 500 元) ----
+# ---- 3. 每月必定消費（剛需）摺疊區 ----
 with st.expander("3. 每月必要生活開支統計 (剛需消費)", expanded=True):
     essential_total_placeholder = st.empty()
     
     default_essential = pd.DataFrame([
-        {"必備事項": "午餐/公車", "消費金額": 500, "選入計算": True},
+        {"必備事項": "午餐", "消費金額": 350, "選入計算": True},
+        {"必備事項": "交通", "消費金額": 150, "選入計算": True},
     ])
     
     edited_essential_df = st.data_editor(
@@ -144,12 +145,12 @@ with st.expander("3. 每月必要生活開支統計 (剛需消費)", expanded=Tr
 
 st.write("")
 
-# ---- 4. 每月自我意願消費 摺疊區 (預設初始化為：娛樂預算共 400 元) ----
+# ---- 4. 每月自我意願消費（非剛需）摺疊區 ----
 with st.expander("4. 每月非必要娛樂開支預算 (彈性消費)", expanded=True):
     discretionary_total_placeholder = st.empty()
     
     default_discretionary = pd.DataFrame([
-        {"娛樂事項": "手搖飲", "消費金額": 150, "選入計算": True},
+        {"娛樂事項": "奶茶", "消費金額": 150, "選入計算": True},
         {"娛樂事項": "遊戲", "消費金額": 250, "選入計算": True},
     ])
     
@@ -166,12 +167,11 @@ with st.expander("4. 每月非必要娛樂開支預算 (彈性消費)", expanded
     discretionary_total_placeholder.metric("娛樂開支總計 (已選入)", f"{total_discretionary} 元")
 
 st.write("") 
-st.sidebar.markdown(f"**演示提示**：目前已自動代入零錢通最佳效果測試數據組。")
-st.style = st.divider()
+st.divider()
 
-# ---- 5. 夢想目標輸入區 (預設初始化為：15,000 元高階平板，拉長模擬跨度) ----
+# ---- 5. 夢想目標輸入區 ----
 st.markdown("### **5. 設定最終儲蓄目標**")
-target_name = st.text_input("儲蓄目標物名稱", value="高階全視線平板電腦")
+target_name = st.text_input("儲蓄目標物名稱", value="電腦")
 target_value = st.number_input("目標物市場價格 (元)", min_value=1, value=15000, step=100)
 
 
@@ -308,7 +308,7 @@ else:
 
 
 # =========================================================
-# 🌟 第二大板塊：全新理財板塊「理財加持」 (預設鎖定為：微信零錢通)
+# 🌟 第二大板塊：全新理財板塊「理財加持」
 # =========================================================
 st.write("")
 st.write("")
@@ -488,4 +488,4 @@ else:
             if pd.isna(item_cost) or item_cost <= 0: continue
             temp_active_expenses = active_expenses.drop(idx)
             new_days_inv, _ = simulate_timeline(target_value, total_savings, base_savings, active_incomes, temp_active_expenses, active_rate)
-            st.write(f"如果減少 **{item_name}** 開支（省下 {round(item_cost)} 元）並配合 **{selected_tool.split(' ')[0]}**，我們的解鎖時間將提早 **{round(base_days_inv - new_days_inv)}** 天。")
+            st.write(f"如果減少 **{item_name}** 開支（省下 {round(item_cost)} 元）並配合 **{selected_tool.split(' ')[0]}**，我們的解鎖時間將提早 **{round(base_days_inv - new_days_inv)}** 天。")v
