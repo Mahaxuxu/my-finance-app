@@ -34,7 +34,7 @@ with st.expander("2. 點開填寫：目前個人總存款 (元)", expanded=True)
 
 st.write("") 
 
-# ---- 預計收入 摺疊區 (已修復 TypeError 參數錯誤) ----
+# ---- 預計收入 摺疊區 ----
 with st.expander("預計收入 (未來特定單筆收入)", expanded=True):
     income_total_placeholder = st.empty()
     
@@ -42,7 +42,6 @@ with st.expander("預計收入 (未來特定單筆收入)", expanded=True):
         {"項目名稱": "過年紅包", "金額": 1000, "預計收入日期": datetime.date.today() + datetime.timedelta(days=60), "選入計算": True},
     ])
     
-    # 移除了引發錯誤的 placeholder 參數
     edited_incomes_df = st.data_editor(
         default_incomes,
         num_rows="dynamic",
@@ -68,6 +67,42 @@ with st.expander("預計收入 (未來特定單筆收入)", expanded=True):
         
     total_future_income = pd.to_numeric(active_incomes["金額"], errors='coerce').fillna(0).sum()
     income_total_placeholder.metric("預計未來收入總計 (已選入)", f"{total_future_income} 元")
+
+st.write("")
+
+# ---- 同理新增：預計開支 摺疊區 (內建日曆選擇器) ----
+with st.expander("預計開支 (未來特定單筆開支)", expanded=True):
+    expense_total_placeholder = st.empty()
+    
+    default_expenses = pd.DataFrame([
+        {"項目名稱": "補習班教材費", "金額": 500, "預計開支日期": datetime.date.today() + datetime.timedelta(days=30), "選入計算": True},
+    ])
+    
+    edited_expenses_df = st.data_editor(
+        default_expenses,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "項目名稱": st.column_config.TextColumn("第一項：項目名稱"),
+            "金額": st.column_config.NumberColumn("第二項：金額 (元)", min_value=0, step=50),
+            "預計開支日期": st.column_config.DateColumn(
+                "第三項：預計開支日期 (點擊彈出日曆)",
+                min_value=datetime.date.today(),
+                format="YYYY-MM-DD"
+            ),
+            "選入計算": st.column_config.CheckboxColumn("選入計算")
+        },
+        key="expenses_table"
+    )
+    
+    edited_expenses_df["選入計算"] = edited_expenses_df["選入計算"].fillna(False).astype(bool)
+    active_expenses = edited_expenses_df[edited_expenses_df["選入計算"] == True].copy()
+    
+    if not active_expenses.empty:
+        active_expenses["預計開支日期"] = pd.to_datetime(active_expenses["預計開支日期"]).dt.date
+        
+    total_future_expense = pd.to_numeric(active_expenses["金額"], errors='coerce').fillna(0).sum()
+    expense_total_placeholder.metric("預計未來開支總計 (已選入)", f"{total_future_expense} 元")
 
 st.write("")
 
@@ -123,8 +158,8 @@ st.markdown("### **5. 存錢想買的東西以及金額**")
 target_name = st.text_input("你想買的夢想物品名稱", value="最新款降噪耳機")
 target_value = st.number_input("該物品的目標價值 (元)", min_value=1, value=3000, step=100)
 
-# --- 6. 核心計量算法 ---
-def simulate_timeline(target_val, initial_savings, monthly_savings, active_inc_df):
+# --- 6. 核心計量算法：升級為雙向現金流時序模擬器 ---
+def simulate_timeline(target_val, initial_savings, monthly_savings, active_inc_df, active_exp_df):
     today = datetime.date.today()
     current_savings = initial_savings
     daily_savings = monthly_savings / 30.4
@@ -132,10 +167,17 @@ def simulate_timeline(target_val, initial_savings, monthly_savings, active_inc_d
     if current_savings >= target_val:
         return 0, today
         
+    # 建立收入字典
     if not active_inc_df.empty:
         income_by_date = active_inc_df.groupby("預計收入日期")["金額"].sum().to_dict()
     else:
         income_by_date = {}
+        
+    # 建立開支字典
+    if not active_exp_df.empty:
+        expense_by_date = active_exp_df.groupby("預計開支日期")["金額"].sum().to_dict()
+    else:
+        expense_by_date = {}
         
     max_days = 3650
     
@@ -143,8 +185,13 @@ def simulate_timeline(target_val, initial_savings, monthly_savings, active_inc_d
         sim_date = today + datetime.timedelta(days=day)
         current_savings += daily_savings
         
+        # 捕捉當天是否有單筆收入注入
         if sim_date in income_by_date:
             current_savings += income_by_date[sim_date]
+            
+        # 捕捉當天是否有單筆開支扣除
+        if sim_date in expense_by_date:
+            current_savings -= expense_by_date[sim_date]
             
         if current_savings >= target_val:
             return day, sim_date
@@ -160,7 +207,8 @@ base_savings = income - total_essential - total_discretionary
 if base_savings <= 0:
     st.error("預算超支警告：你每月的總開銷已經超過了你的收入！請點開上方摺疊盒刪減非必須開支。")
 else:
-    base_days, predicted_date = simulate_timeline(target_value, total_savings, base_savings, active_incomes)
+    # 將收入與開支同時傳入模擬器中
+    base_days, predicted_date = simulate_timeline(target_value, total_savings, base_savings, active_incomes, active_expenses)
     base_months = base_days / 30.4
     
     col_kpi1, col_kpi2 = st.columns(2)
@@ -180,7 +228,8 @@ else:
         new_discretionary = total_discretionary * (1 - s)
         new_savings = income - total_essential - new_discretionary
         
-        new_days, scenario_date = simulate_timeline(target_value, total_savings, new_savings, active_incomes)
+        # 不同省錢情境下同步加入雙向現金流模擬
+        new_days, scenario_date = simulate_timeline(target_value, total_savings, new_savings, active_incomes, active_expenses)
         days_saved = base_days - new_days
         
         sensitivity_data.append({
