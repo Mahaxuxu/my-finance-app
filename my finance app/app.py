@@ -488,4 +488,4 @@ else:
             if pd.isna(item_cost) or item_cost <= 0: continue
             temp_active_expenses = active_expenses.drop(idx)
             new_days_inv, _ = simulate_timeline(target_value, total_savings, base_savings, active_incomes, temp_active_expenses, active_rate)
-            st.write(f"如果減少 **{item_name}** 開支（省下 {round(item_cost)} 元）並配合 **{selected_tool.split(' ')[0]}**，我們的解鎖時間將提早 **{round(base_days_inv - new_days_inv)}** 天。")v
+            st.write(f"如果減少 **{item_name}** 開支（省下 {round(item_cost)} 元）並配合 **{selected_tool.split(' ')[0]}**，我們的解鎖時間將提早 **{round(base_days_inv - new_days_inv)}** 天。")
